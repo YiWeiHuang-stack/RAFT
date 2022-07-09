@@ -160,7 +160,7 @@ def train(args):
     should_keep_training = True
     while should_keep_training:
 
-        for i_batch, data_blob in enumerate(train_loader):
+        for data_blob in train_loader:
             optimizer.zero_grad()
             image1, image2, flow, valid = [x.cuda() for x in data_blob]
 
@@ -173,9 +173,9 @@ def train(args):
 
             loss, metrics = sequence_loss(flow_predictions, flow, valid, args.gamma)
             scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)                
+            scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
-            
+
             scaler.step(optimizer)
             scheduler.step()
             scaler.update()
@@ -189,18 +189,18 @@ def train(args):
                 results = {}
                 for val_dataset in args.validation:
                     if val_dataset == 'chairs':
-                        results.update(evaluate.validate_chairs(model.module))
+                        results |= evaluate.validate_chairs(model.module)
                     elif val_dataset == 'sintel':
                         results.update(evaluate.validate_sintel(model.module))
                     elif val_dataset == 'kitti':
                         results.update(evaluate.validate_kitti(model.module))
 
                 logger.write_dict(results)
-                
+
                 model.train()
                 if args.stage != 'chairs':
                     model.module.freeze_bn()
-            
+
             total_steps += 1
 
             if total_steps > args.num_steps:
@@ -208,7 +208,7 @@ def train(args):
                 break
 
     logger.close()
-    PATH = 'checkpoints/%s.pth' % args.name
+    PATH = f'checkpoints/{args.name}.pth'
     torch.save(model.state_dict(), PATH)
 
     return PATH

@@ -29,15 +29,14 @@ class RAFT(nn.Module):
         if args.small:
             self.hidden_dim = hdim = 96
             self.context_dim = cdim = 64
-            args.corr_levels = 4
             args.corr_radius = 3
-        
+
         else:
             self.hidden_dim = hdim = 128
             self.context_dim = cdim = 128
-            args.corr_levels = 4
             args.corr_radius = 4
 
+        args.corr_levels = 4
         if 'dropout' not in self.args:
             self.args.dropout = 0
 
@@ -98,7 +97,7 @@ class RAFT(nn.Module):
         # run the feature network
         with autocast(enabled=self.args.mixed_precision):
             fmap1, fmap2 = self.fnet([image1, image2])        
-        
+
         fmap1 = fmap1.float()
         fmap2 = fmap2.float()
         if self.args.alternate_corr:
@@ -119,7 +118,7 @@ class RAFT(nn.Module):
             coords1 = coords1 + flow_init
 
         flow_predictions = []
-        for itr in range(iters):
+        for _ in range(iters):
             coords1 = coords1.detach()
             corr = corr_fn(coords1) # index correlation volume
 
@@ -131,14 +130,15 @@ class RAFT(nn.Module):
             coords1 = coords1 + delta_flow
 
             # upsample predictions
-            if up_mask is None:
-                flow_up = upflow8(coords1 - coords0)
-            else:
-                flow_up = self.upsample_flow(coords1 - coords0, up_mask)
-            
+            flow_up = (
+                upflow8(coords1 - coords0)
+                if up_mask is None
+                else self.upsample_flow(coords1 - coords0, up_mask)
+            )
+
             flow_predictions.append(flow_up)
 
         if test_mode:
             return coords1 - coords0, flow_up
-            
+
         return flow_predictions
